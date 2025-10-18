@@ -217,6 +217,31 @@
                 font-size: 2rem;
             }
         }
+		.timer-message {
+			background: rgba(253, 187, 45, 0.2);
+            border: 1px solid #fdbb2d;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            text-align: center;
+            font-weight: bold;
+        }
+
+       .qr-code {
+		transition: opacity 0.5s ease;
+       }
+
+       .hidden {
+          opacity: 0;
+          pointer-events: none;
+        }
+
+        #countdown {
+            font-family: 'Courier New', monospace;
+            font-size: 1.2rem;
+            color: #fdbb2d;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -247,12 +272,21 @@
                         <div class="step-text">Access the AR experience and claim your badge</div>
                     </div>
                     
-                    <div class="qr-container">
-                        <div class="qr-code">
-                            <!-- Placeholder for QR code -->
-                            <img src="https://github.com/itzsobiya/ARGateAccess1/index1.html" alt="QR Code">
+                   <div class="qr-container">
+                        <div id="qrTimerMessage" class="timer-message" style="display: none;">
+                            <p>🕒 QR Code will reappear in: <span id="countdown">01:00:00</span></p>
                         </div>
-                        <p>Scan to open WebAR page</p>
+    
+                         <div id="qrCodeElement" class="qr-code">
+                         <img src="C:\Users\sobiy\OneDrive\Desktop\project\adobe-express-qr-code.png" 
+                            alt="WebAR QR Code" id="qrImage">
+                           <p>Scan to open WebAR page</p>
+                         </div>
+                   
+    
+                         <button class="button secondary" id="manualRefresh" style="display: none;">
+                          Show QR Code Now
+                        </button>
                     </div>
                 </div>
                 
@@ -921,6 +955,123 @@
             // Initialize UI
             updateUI();
         });
+		class QRTimer {
+    constructor() {
+        this.visibilityDuration = 10000; // 10 seconds
+        this.cooldownDuration = 120000; // 1 hour (3600000 ms)
+        this.timerInterval = null;
+        this.isVisible = true;
+        
+        this.initializeTimer();
+    }
+    
+    initializeTimer() {
+        // Check if we're in cooldown from previous session
+        const lastHideTime = localStorage.getItem('qrLastHideTime');
+        if (lastHideTime) {
+            const timeSinceHide = Date.now() - parseInt(lastHideTime);
+            if (timeSinceHide < this.cooldownDuration) {
+                // Still in cooldown, don't show QR yet
+                const remainingCooldown = this.cooldownDuration - timeSinceHide;
+                this.startCooldown(remainingCooldown);
+                return;
+            }
+        }
+        
+        // Start the 10-second visibility timer
+        this.startVisibilityTimer();
+    }
+    
+    startVisibilityTimer() {
+        this.showQRCode();
+        
+        // Hide QR code after 10 seconds
+        setTimeout(() => {
+            this.hideQRCode();
+            this.startCooldown(this.cooldownDuration);
+        }, this.visibilityDuration);
+    }
+    
+    startCooldown(duration) {
+        this.isVisible = false;
+        localStorage.setItem('qrLastHideTime', Date.now().toString());
+        
+        this.showTimerMessage();
+        this.startCountdownTimer(duration);
+        
+        // Show manual refresh button after 30 minutes
+        setTimeout(() => {
+            document.getElementById('manualRefresh').style.display = 'inline-block';
+        }, 1800000); // 30 minutes
+    }
+    
+    startCountdownTimer(duration) {
+        const countdownElement = document.getElementById('countdown');
+        const endTime = Date.now() + duration;
+        
+        this.timerInterval = setInterval(() => {
+            const now = Date.now();
+            const remaining = endTime - now;
+            
+            if (remaining <= 0) {
+                clearInterval(this.timerInterval);
+                this.startVisibilityTimer();
+                return;
+            }
+            
+            // Update countdown display
+            const hours = Math.floor(remaining / (1000 * 60 * 60));
+            const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+            
+            countdownElement.textContent = 
+                `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }, 1000);
+    }
+    
+    showQRCode() {
+        const qrElement = document.getElementById('qrCodeElement');
+        const timerMessage = document.getElementById('qrTimerMessage');
+        const refreshButton = document.getElementById('manualRefresh');
+        
+        qrElement.classList.remove('hidden');
+        timerMessage.style.display = 'none';
+        refreshButton.style.display = 'none';
+        this.isVisible = true;
+        
+        // Clear any existing interval
+        if (this.timerInterval) {
+            clearInterval(this.timerInterval);
+        }
+    }
+    
+    hideQRCode() {
+        const qrElement = document.getElementById('qrCodeElement');
+        qrElement.classList.add('hidden');
+        this.isVisible = false;
+    }
+    
+    showTimerMessage() {
+        const timerMessage = document.getElementById('qrTimerMessage');
+        timerMessage.style.display = 'block';
+    }
+    
+    // Manual refresh for admin/teacher
+    manualRefresh() {
+        localStorage.removeItem('qrLastHideTime');
+        this.startVisibilityTimer();
+    }
+}
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    const qrTimer = new QRTimer();
+    
+    // Add manual refresh button handler
+    document.getElementById('manualRefresh').addEventListener('click', function() {
+        qrTimer.manualRefresh();
+    });
+});
     </script>
 </body>
 </html>
